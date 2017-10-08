@@ -1,0 +1,348 @@
+<html>
+<head>
+	<meta name="description" content="This is a fully JavaScript-powered particle system running in your browser! Easily configure spawn rate, location, velocity and gravity.">
+
+<SCRIPT>
+	// SETTINGS
+	var WINDOW_X_SIZE = 800;
+	var WINDOW_Y_SIZE = 600;
+	var FRAMERATE = 40;
+	
+	var PARTICLE_RADIUS = 5;
+	var SPAWN_RATE = 5;
+	var EMITTER_X = 400;
+	var EMITTER_Y = 200;
+	var DRAW_STREAKS = false;
+	
+	var GRAVITY_X = 0;
+	var GRAVITY_Y = 1;
+	var VELOCITY_X_BASE = 0;
+	var VELOCITY_X_VARIANCE = 20;
+	var VELOCITY_Y_BASE = -10;
+	var VELOCITY_Y_VARIANCE = 10;
+	
+	var BOUNCE_AT_EDGES = false;
+	var BOUNCE_DAMPING = 0.8;
+	var BOUNCE_DAMPING_VARIANCE = 0.1;
+	var MAX_BOUNCES = 5;
+	
+	
+	// Internal Variables
+	var lastFrameTime = new Date().getTime();
+	var isDragging = false;
+
+	// Particle Class Definition
+	var Particle = function( xPos, yPos, xVel, yVel ) {
+		this.xPosition = xPos;
+		this.yPosition = yPos;
+		this.lastXPosition = xPos;
+		this.lastYPosition = yPos;
+		this.xVelocity = xVel;
+		this.yVelocity = yVel;
+		this.colorString = randomColor();
+		this.bounces = 0;
+		
+		this.dead = false;
+	};
+	
+	Particle.prototype.advance = function() {
+		this.lastXPosition = this.xPosition;
+		this.lastYPosition = this.yPosition;
+		this.xPosition += this.xVelocity;
+		this.yPosition += this.yVelocity;
+		
+		if ( this.xPosition < 0 || this.xPosition > WINDOW_X_SIZE ) {
+			if ( !BOUNCE_AT_EDGES ) {
+				this.dead = true;
+			} else {
+				var damping = BOUNCE_DAMPING + ( Math.random() * BOUNCE_DAMPING_VARIANCE ) - ( BOUNCE_DAMPING_VARIANCE / 2.0 );
+				this.xVelocity *= -damping;
+				this.xPosition += this.xVelocity;
+				this.bounces += 1;
+				
+				if ( this.bounces > MAX_BOUNCES ) {
+					this.dead = true;
+				}
+			}
+		}
+		if ( this.yPosition < 0 || this.yPosition > WINDOW_Y_SIZE ) {
+			if ( !BOUNCE_AT_EDGES ) {
+				this.dead = true;
+			} else {
+				var damping = BOUNCE_DAMPING + ( Math.random() * BOUNCE_DAMPING_VARIANCE ) - ( BOUNCE_DAMPING_VARIANCE / 2.0 );
+				this.yVelocity *= -damping;
+				this.yPosition += this.yVelocity;
+				this.bounces += 1;
+				
+				if ( this.bounces > MAX_BOUNCES ) {
+					this.dead = true;
+				}
+			}
+		}
+	};
+	
+	Particle.prototype.addVelocity = function( xAccl, yAccl ) {
+		this.xVelocity += xAccl;
+		this.yVelocity += yAccl;
+	};
+	
+	Particle.prototype.isDead = function() {
+		return this.dead;
+	};
+	
+	Particle.prototype.draw = function( context ) {
+		context.beginPath();
+		
+		if ( !DRAW_STREAKS ) {
+			context.fillStyle = this.colorString;
+			context.arc( this.xPosition, this.yPosition, PARTICLE_RADIUS, 0, 2*Math.PI );
+			context.fill();
+		} else {
+			context.strokeStyle = this.colorString;
+			context.lineWidth = PARTICLE_RADIUS;
+			context.moveTo( this.lastXPosition, this.lastYPosition );
+			context.lineTo( this.xPosition, this.yPosition );
+			context.stroke();
+		}
+		
+	};
+	
+	// ----------------------------------------------------------------------------------------
+	
+	function main() {
+		var particlesList = [];
+		setInterval( function() { runMainLogic( particlesList ); }, (1000.0 / FRAMERATE) );
+		
+		// Event Listeners
+		document.getElementById("streaks_checkbox").addEventListener( "click", function() {
+			var streaksSetting = document.getElementById( "streaks_checkbox" ).checked;
+			DRAW_STREAKS = streaksSetting;
+		});
+		
+		document.getElementById("setting_size").addEventListener( "input", function() {
+			var sizeSetting = document.getElementById( "setting_size" ).value;
+			PARTICLE_RADIUS = sizeSetting;
+		});
+		
+		document.getElementById("setting_spawnrate").addEventListener( "input", function() {
+			var rateSetting = document.getElementById( "setting_spawnrate" ).value;
+			SPAWN_RATE = rateSetting;
+		});
+		
+		document.getElementById("setting_velXbase").addEventListener( "input", function() {
+			var velXbaseSetting = document.getElementById( "setting_velXbase" ).value;
+			VELOCITY_X_BASE = parseInt(velXbaseSetting);
+		});
+		
+		document.getElementById("setting_velXvar").addEventListener( "input", function() {
+			var velXvarianceSetting = document.getElementById( "setting_velXvar" ).value;
+			VELOCITY_X_VARIANCE = velXvarianceSetting;
+		});
+		
+		document.getElementById("setting_velYbase").addEventListener( "input", function() {
+			var velYbaseSetting = document.getElementById( "setting_velYbase" ).value;
+			VELOCITY_Y_BASE = parseInt(velYbaseSetting);
+		});
+		
+		document.getElementById("setting_velYvar").addEventListener( "input", function() {
+			var velYvarianceSetting = document.getElementById( "setting_velYvar" ).value;
+			VELOCITY_Y_VARIANCE = velYvarianceSetting;
+		});
+		
+		document.getElementById("setting_gravityX").addEventListener( "input", function() {
+			var gravityXsetting = document.getElementById( "setting_gravityX" ).value;
+			GRAVITY_X = parseInt(gravityXsetting);
+		});
+		
+		document.getElementById("setting_gravityY").addEventListener( "input", function() {
+			var gravityYsetting = document.getElementById( "setting_gravityY" ).value;
+			GRAVITY_Y = parseInt(gravityYsetting);
+		});
+		
+		document.getElementById("canvas").addEventListener( "mousedown", function( e ) {
+			isDragging = true;
+			EMITTER_X = e.pageX;
+			EMITTER_Y = e.pageY;
+		});
+		
+		document.getElementById("canvas").addEventListener( "mousemove", function( e ) {
+			if ( isDragging ) {
+				EMITTER_X = e.pageX;
+				EMITTER_Y = e.pageY;
+			}
+		});
+		
+		document.getElementById("canvas").addEventListener( "mouseup", function( e ) {
+			isDragging = false;
+			EMITTER_X = e.pageX;
+			EMITTER_Y = e.pageY;
+		});
+		
+		document.getElementById("bounce_checkbox").addEventListener( "click", function() {
+			var bounceSetting = document.getElementById( "bounce_checkbox" ).checked;
+			BOUNCE_AT_EDGES = bounceSetting;
+		});
+		
+		document.getElementById("setting_damping").addEventListener( "input", function() {
+			var dampSetting = document.getElementById( "setting_damping" ).value;
+			BOUNCE_DAMPING = parseFloat(dampSetting);
+		});
+		
+		document.getElementById("setting_dampingvar").addEventListener( "input", function() {
+			var dampvarSetting = document.getElementById( "setting_dampingvar" ).value;
+			BOUNCE_DAMPING_VARIANCE = parseFloat(dampvarSetting);
+		});
+		
+		document.getElementById("setting_maxbounces").addEventListener( "input", function() {
+			var bounceSetting = document.getElementById( "setting_maxbounces" ).value;
+			MAX_BOUNCES = parseInt(bounceSetting);
+		});
+	}
+	
+	function runMainLogic( particlesList ) {
+		spawnLoop( particlesList );
+		advanceLoop( particlesList );
+		renderLoop( particlesList );
+		feedbackToGUI( particlesList );
+	}
+	
+	function spawnLoop( particlesList ) {
+		for (var i=0; i<SPAWN_RATE; i++) {
+			var offsetX = (Math.random() * VELOCITY_X_VARIANCE) - (VELOCITY_X_VARIANCE/2.0);
+			var offsetY = (Math.random() * VELOCITY_Y_VARIANCE) - (VELOCITY_Y_VARIANCE/2.0);
+			particlesList.push( new Particle(EMITTER_X, EMITTER_Y, VELOCITY_X_BASE+offsetX, VELOCITY_Y_BASE+offsetY) );
+		}
+	}
+	
+	function advanceLoop( particlesList ) {
+		for (var i=particlesList.length-1; i>=0; i--) {
+			var currentParticle = particlesList[i];
+			
+			currentParticle.advance();
+			currentParticle.addVelocity( GRAVITY_X, GRAVITY_Y );
+			
+			if (currentParticle.isDead()) {
+				particlesList.splice(i,1);
+			}
+		}
+		
+	}
+	
+	function renderLoop( particlesList ) {
+		var context = document.getElementById("canvas").getContext("2d");
+		context.clearRect( 0,0,WINDOW_X_SIZE,WINDOW_Y_SIZE );
+		
+		for (var i=0; i<particlesList.length; i++) {
+			particlesList[i].draw( context );
+		}
+	}
+	
+	function feedbackToGUI( particlesList ) {
+		document.getElementById("particleCount_display").innerHTML = particlesList.length;
+		
+		var currentTime = new Date().getTime();
+		var renderingRate = Math.floor( 1000.0 / ( currentTime - lastFrameTime ) );
+		lastFrameTime = currentTime;
+		
+		if (renderingRate < FRAMERATE) {
+			renderingRate = "<span style='color:red'>" + renderingRate + "</span>"
+		}
+		document.getElementById("framerate_display").innerHTML = renderingRate + " / " + FRAMERATE;
+		
+		document.getElementById("position_display").innerHTML = EMITTER_X + ", " + EMITTER_Y;
+		document.getElementById("size_display").innerHTML = PARTICLE_RADIUS;
+		document.getElementById("spawnrate_display").innerHTML = SPAWN_RATE;
+		
+		document.getElementById("velXbase_display").innerHTML = VELOCITY_X_BASE;
+		document.getElementById("velXvar_display").innerHTML = VELOCITY_X_VARIANCE;
+		document.getElementById("velYbase_display").innerHTML = VELOCITY_Y_BASE;
+		document.getElementById("velYvar_display").innerHTML = VELOCITY_Y_VARIANCE;
+		
+		document.getElementById("gravityX_display").innerHTML = GRAVITY_X;
+		document.getElementById("gravityY_display").innerHTML = GRAVITY_Y;
+		
+		document.getElementById("damping_display").innerHTML = BOUNCE_DAMPING;
+		document.getElementById("dampingvar_display").innerHTML = BOUNCE_DAMPING_VARIANCE;
+		document.getElementById("maxbounces_display").innerHTML = MAX_BOUNCES;
+	}
+	
+	function randomColor() {
+		var colR = makeRandomHexCode();
+		var colG = makeRandomHexCode();
+		var colB = makeRandomHexCode();
+		
+		return "#" + colR + colG + colB;
+	}
+	
+	function makeRandomHexCode() {
+		var randVal = Math.floor( Math.random() * 10 ) + 4;
+		
+		switch( randVal ) {
+			case 0: return "00";
+			case 1: return "11";
+			case 2: return "22";
+			case 3: return "33";
+			case 4: return "44";
+			case 5: return "55";
+			case 6: return "66";
+			case 7: return "77";
+			case 8: return "88";
+			case 9: return "99";
+			case 10: return "AA";
+			case 11: return "BB";
+			case 12: return "CC";
+			case 13: return "DD";
+			case 14: return "EE";
+			case 15: return "FF";
+		}
+	}
+	
+</SCRIPT>
+
+</head>
+
+<body bgcolor="#999" onload="main()" style="font-family:sans-serif;">
+	<canvas id="canvas" width=800 height=600 style="background-color:#FFF; display:inline-block;"></canvas>
+	
+	&nbsp;
+	
+	<form style="border:1px solid black; display:inline-block; vertical-align:top; padding:15px; background-color:#BBB;">
+	
+		<div style="border:1px solid black; padding:10px; background-color:#DDD;">
+			<span style="font-weight:bold">Particles: </span><span id="particleCount_display"></span><br>
+			<span style="font-weight:bold">Framerate: </span><span id="framerate_display"></span>
+		</div>
+		
+		<p />
+	
+		Emitter Position: Click to set (<span id="position_display"></span>)<br>
+		<input type="checkbox" id="streaks_checkbox"><label for="streaks_checkbox">Draw Streaks</label></input><br>
+		<label for="setting_size">Particle Size: </label><input type="range" id="setting_size" min=1 max=20 value=5></input> <span id="size_display"></span><br>
+		<label for="setting_spawnrate">Spawn Rate: </label><input type="range" id="setting_spawnrate" min=0 max=50 value=5></input> <span id="spawnrate_display"></span>
+		
+		<hr>
+		
+		<label for="setting_velXbase">X Velocity Base: </label><input type="range" id="setting_velXbase" min=-20 max=20 value=0></input> <span id="velXbase_display"></span><br>
+		<label for="setting_velXvar">X Velocity Variance: </label><input type="range" id="setting_velXvar" min=0 max=30 value=20></input> <span id="velXvar_display"></span><br>
+		<label for="setting_velYbase">Y Velocity Base: </label><input type="range" id="setting_velYbase" min=-20 max=20 value=-10></input> <span id="velYbase_display"></span><br>
+		<label for="setting_velYvar">Y Velocity Variance: </label><input type="range" id="setting_velYvar" min=0 max=30 value=10></input> <span id="velYvar_display"></span>
+		
+		<hr>
+		
+		<label for="setting_gravityX">X Gravity: </label><input type="range" id="setting_gravityX" min=-5 max=5 value=0></input> <span id="gravityX_display"></span><br>
+		<label for="setting_gravityY">Y Gravity: </label><input type="range" id="setting_gravityY" min=-5 max=5 value=1></input> <span id="gravityY_display"></span>
+		
+		<hr>
+		
+		<input type="checkbox" id="bounce_checkbox"><label for="bounce_checkbox">Bouncy Edges</label></input><br>
+		<label for="setting_damping">Bounce Damping: </label><input type="range" id="setting_damping" min=0 max=1 value=0.8 step=0.05></input> <span id="damping_display"></span><br>
+		<label for="setting_dampingvar">Bounce Damping Variance: </label><input type="range" id="setting_dampingvar" min=0 max=0.5 value=0.1 step=0.05></input> <span id="dampingvar_display"></span><br>
+		<label for="setting_maxbounces">Maximum Bounces: </label><input type="range" id="setting_maxbounces" min=1 max=10 value=5></input> <span id="maxbounces_display"></span>
+		
+		<hr>
+		
+		
+		
+	</form>
+</body>
+</html>

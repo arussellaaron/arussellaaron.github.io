@@ -1,0 +1,112 @@
+<html>
+<head>
+
+<SCRIPT>
+	// CONSTANTS
+	var WINDOW_X_SIZE = 800;
+	var WINDOW_Y_SIZE = 600;
+	var FRAMERATE = 40;
+	
+	var PARTICLE_RADIUS = 5;
+	var SPAWN_RATE = 5;
+	var EMITTER_X = 400;
+	var EMITTER_Y = 300;
+	
+	var GRAVITY_X = 0;
+	var GRAVITY_Y = 0;
+	var VELOCITY_X_BASE = 0;
+	var VELOCITY_X_VARIANCE = 3;
+	var VELOCITY_Y_BASE = 0;
+	var VELOCITY_Y_VARIANCE = 3;
+
+
+	// Particle Class Definition
+	var Particle = function( xPos, yPos, xVel, yVel ) {
+		this.xPosition = xPos;
+		this.yPosition = yPos;
+		this.xVelocity = xVel;
+		this.yVelocity = yVel;
+		
+		this.dead = false;
+	};
+	
+	Particle.prototype.advance = function() {
+		this.xPosition += this.xVelocity;
+		this.yPosition += this.yVelocity;
+		
+		if ( this.xPosition < 0 || this.xPosition > WINDOW_X_SIZE ) {
+			this.dead = true;
+		}
+		if ( this.yPosition < 0 || this.yPosition > WINDOW_Y_SIZE ) {
+			this.dead = true;
+		}
+	};
+	
+	Particle.prototype.addVelocity = function( xAccl, yAccl ) {
+		this.xVelocity += xAccl;
+		this.yVelocity += yAccl;
+	};
+	
+	Particle.prototype.isDead = function() {
+		return this.dead;
+	};
+	
+	Particle.prototype.draw = function( context ) {
+		context.beginPath();
+		context.arc( this.xPosition, this.yPosition, PARTICLE_RADIUS, 0, 2*Math.PI );
+		context.fill();
+	};
+	
+	
+	function main() {
+		var particlesList = [];
+		setInterval( function() { runMainLogic( particlesList ); }, (1000.0 / FRAMERATE) );
+	}
+	
+	function runMainLogic( particlesList ) {
+		spawnLoop( particlesList );
+		advanceLoop( particlesList );
+		renderLoop( particlesList );
+	}
+	
+	function spawnLoop( particlesList ) {
+		for (var i=0; i<SPAWN_RATE; i++) {
+			var offsetX = (Math.random() * VELOCITY_X_VARIANCE) - (VELOCITY_X_VARIANCE/2.0);
+			var offsetY = (Math.random() * VELOCITY_Y_VARIANCE) - (VELOCITY_Y_VARIANCE/2.0);
+			particlesList.push( new Particle(EMITTER_X,EMITTER_Y,VELOCITY_X_BASE+offsetX ,VELOCITY_Y_BASE+offsetY) );
+		}
+	}
+	
+	function advanceLoop( particlesList ) {
+		for (var i=particlesList.length-1; i>=0; i--) {
+			var currentParticle = particlesList[i];
+			
+			currentParticle.advance();
+			currentParticle.addVelocity( GRAVITY_X, GRAVITY_Y );
+			
+			if (currentParticle.isDead()) {
+				particlesList.splice(i,1);
+			}
+		}
+		
+	}
+	
+	function renderLoop( particlesList ) {
+		var context = document.getElementById("canvas").getContext("2d");
+		context.clearRect( 0,0,WINDOW_X_SIZE,WINDOW_Y_SIZE );
+		
+		for (var i=0; i<particlesList.length; i++) {
+			particlesList[i].draw( context );
+		}
+	}
+	
+	
+	
+</SCRIPT>
+
+</head>
+
+<body bgcolor="#AAA" onload="main()">
+	<canvas id="canvas" width=800 height=600 style="background-color:#FFF"></canvas>
+</body>
+</html>
